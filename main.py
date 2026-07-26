@@ -12,7 +12,13 @@ from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, MessageChain, filter
 from astrbot.api.star import Context, Star, StarTools
 
-from .monitor import ProbeResult, T2IProbeClient, T2ITarget, parse_targets
+from .monitor import (
+    ProbeResult,
+    T2IProbeClient,
+    T2ITarget,
+    normalize_umos,
+    parse_targets,
+)
 from .state import (
     JsonStateStore,
     MonitorState,
@@ -53,7 +59,7 @@ class T2IHealthMonitor(Star):
         self._stopping.clear()
         self._http_client = httpx.AsyncClient(
             follow_redirects=True,
-            headers={"User-Agent": "AstrBot-t2i-health-monitor/0.1"},
+            headers={"User-Agent": "AstrBot-t2i-health-monitor/0.1.1"},
             trust_env=True,
         )
         self._probe_client = T2IProbeClient(self._http_client)
@@ -165,7 +171,7 @@ class T2IHealthMonitor(Star):
 
         notifications: list[NotificationEvent] = []
         async with self._state_lock:
-            notification_enabled = bool(self._failure_push_umo())
+            notification_enabled = bool(self._failure_push_umos())
             for result in results:
                 notification = record_probe_result(
                     self._state,
@@ -182,11 +188,11 @@ class T2IHealthMonitor(Star):
         return notifications
 
     async def _send_daily_report(self) -> None:
-        daily_umo = self._daily_push_umo()
-        if not daily_umo:
+        daily_umos = self._daily_push_umos()
+        if not daily_umos:
             if not self._reported_missing_daily_umo:
                 logger.warning(
-                    "t2i daily report is enabled but daily_push_umo is not configured",
+                    "t2i daily report is enabled but daily_push_umos is not configured",
                 )
                 self._reported_missing_daily_umo = True
             return
@@ -202,15 +208,18 @@ class T2IHealthMonitor(Star):
                 timezone_info,
                 title="t2i 健康日报",
             )
-            delivered = await self._send_text(daily_umo, report)
+            delivered = await self._send_to_umos(daily_umos, report)
             if not delivered:
+                logger.warning(
+                    "t2i daily report was not delivered to every configured UMO; retaining the report period",
+                )
                 return
             self._state.reset_period(utc_now_iso())
             await self._save_state_locked()
 
     async def _send_failure_notification(self, notification: NotificationEvent) -> None:
-        umo = self._failure_push_umo()
-        if not umo:
+        umos = self._failure_push_umos()
+        if not umos:
             return
         timezone_info = self._configured_timezone()
         result = notification.result
@@ -240,7 +249,16 @@ class T2IHealthMonitor(Star):
                     f"本次耗时: {result.latency_ms} ms",
                 ],
             )
-        await self._send_text(umo, message)
+        await self._send_to_umos(umos, message)
+
+    async def _send_to_umos(self, umos: list[str], text: str) -> bool:
+        """Deliver a message to every configured target, even after one failure."""
+
+        delivered = True
+        for umo in umos:
+            if not await self._send_text(umo, text):
+                delivered = False
+        return delivered
 
     async def _send_text(self, umo: str, text: str) -> bool:
         try:
@@ -351,11 +369,17 @@ class T2IHealthMonitor(Star):
             86400,
         )
 
-    def _daily_push_umo(self) -> str:
-        return str(self.config.get("daily_push_umo", "")).strip()
+    def _daily_push_umos(self) -> list[str]:
+        return normalize_umos(
+            self.config.get("daily_push_umos", []),
+            self.config.get("daily_push_umo", ""),
+        )
 
-    def _failure_push_umo(self) -> str:
-        return str(self.config.get("failure_push_umo", "")).strip()
+    def _failure_push_umos(self) -> list[str]:
+        return normalize_umos(
+            self.config.get("failure_push_umos", []),
+            self.config.get("failure_push_umo", ""),
+        )
 
     def _configured_timezone(self) -> ZoneInfo:
         raw_timezone = str(self.config.get("timezone", "Asia/Shanghai")).strip()

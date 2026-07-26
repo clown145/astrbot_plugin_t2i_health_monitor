@@ -31,19 +31,19 @@ Configure the plugin in AstrBot WebUI.
 | `targets` | Repeated t2i target entries. Each has a stable `id`, display name, service root `base_url`, enabled state, and request timeout. |
 | `probe_interval_seconds` | Delay between completed probe cycles. |
 | `daily_push_time` / `timezone` | Daily report schedule, such as `09:00` and `Asia/Shanghai`. |
-| `daily_push_umo` | UMO that receives the full daily health report. |
+| `daily_push_umos` | List of UMOs that each receive the full daily health report. |
 | `failure_retry_count` / `retry_delay_seconds` | Number of retries after a failure and the wait between attempts. |
-| `failure_push_umo` | UMO that receives an outage message after all retries fail. |
+| `failure_push_umos` | List of UMOs that each receive outage and recovery messages. |
 | `failure_notification_cooldown_seconds` | Minimum spacing for repeated notices during the same outage. Set `0` to notify on every failed round. |
-| `send_recovery_notice` | Whether to send a recovery message to `failure_push_umo`. |
+| `send_recovery_notice` | Whether to send a recovery message to every `failure_push_umos` target. |
 
 Use a t2i service root URL, not a docs or endpoint URL. For example:
 
 ```text
-base_url = https://t2i.ciallo.de5.net
+base_url = https://t2i.soulter.top
 ```
 
-The plugin appends `/text2img/generate` and `/text2img/{data.id}` itself.
+This is AstrBot's official t2i service root. The plugin appends `/text2img/generate` and `/text2img/{data.id}` itself.
 
 An AstrBot UMO has the form `platform_id:message_type:session_id`. For a group, it is commonly similar to `aiocqhttp:group:123456`. Send AstrBot's `/sid` command from the target group to obtain the exact UMO for that platform.
 
@@ -58,7 +58,7 @@ Every enabled target appears in the report with:
 - Cumulative health since the plugin first observed that target, including restarts.
 - Period average response time.
 
-The report period is reset only after AstrBot confirms delivery to `daily_push_umo`. If delivery fails, the period remains intact for the next report.
+The report period is reset only after AstrBot confirms delivery to every `daily_push_umos` target. If any delivery fails, the period remains intact for the next report.
 
 ## Commands
 

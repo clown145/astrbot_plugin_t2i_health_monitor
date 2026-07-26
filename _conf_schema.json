@@ -21,8 +21,8 @@
           "base_url": {
             "type": "string",
             "description": "t2i 服务根地址",
-            "default": "https://t2i.ciallo.de5.net",
-            "hint": "例如 https://t2i.example.com；不要填写 /docs 或 /text2img/generate。"
+            "default": "https://t2i.soulter.top",
+            "hint": "默认是 AstrBot 官方 t2i。填写服务根地址，例如 https://t2i.example.com；不要填写 /docs 或 /text2img/generate。"
           },
           "enabled": {
             "type": "bool",
@@ -101,17 +101,35 @@
     "default": "09:00",
     "hint": "24 小时制 HH:MM，按日报时区执行。"
   },
+  "daily_push_umos": {
+    "type": "list",
+    "description": "日报推送 UMO 列表",
+    "items": {
+      "type": "string"
+    },
+    "default": [],
+    "hint": "可填写多个群聊 UMO。群聊示例：aiocqhttp:group:123456；可通过 AstrBot 的 /sid 获取。"
+  },
+  "failure_push_umos": {
+    "type": "list",
+    "description": "故障推送 UMO 列表",
+    "items": {
+      "type": "string"
+    },
+    "default": [],
+    "hint": "某目标耗尽重试后向列表中的每个 UMO 推送故障和恢复信息。"
+  },
   "daily_push_umo": {
     "type": "string",
-    "description": "日报推送 UMO",
+    "description": "旧版日报推送 UMO",
     "default": "",
-    "hint": "群聊示例：aiocqhttp:group:123456。可通过 AstrBot 的 /sid 获取。"
+    "invisible": true
   },
   "failure_push_umo": {
     "type": "string",
-    "description": "故障推送 UMO",
+    "description": "旧版故障推送 UMO",
     "default": "",
-    "hint": "某目标耗尽重试后向此 UMO 推送故障信息。"
+    "invisible": true
   },
   "failure_notification_cooldown_seconds": {
     "type": "int",

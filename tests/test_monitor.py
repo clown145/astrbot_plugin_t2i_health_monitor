@@ -15,6 +15,7 @@ if str(PROJECTS_DIR) not in sys.path:
 from astrbot_plugin_t2i_health_monitor.monitor import (  # noqa: E402
     T2IProbeClient,
     T2ITarget,
+    normalize_umos,
     parse_targets,
 )
 
@@ -156,3 +157,24 @@ class TargetParsingTests(unittest.TestCase):
         self.assertEqual([target.target_id for target in targets], ["first", "second"])
         self.assertEqual(targets[1].base_url, "https://second.example")
         self.assertEqual(len(errors), 1)
+
+    def test_normalize_umos_keeps_order_deduplicates_and_migrates_legacy_value(self) -> None:
+        umos = normalize_umos(
+            [
+                "aiocqhttp:group:100",
+                " aiocqhttp:group:200 ",
+                "aiocqhttp:group:100",
+                123,
+                "",
+            ],
+            "aiocqhttp:group:300",
+        )
+
+        self.assertEqual(
+            umos,
+            [
+                "aiocqhttp:group:100",
+                "aiocqhttp:group:200",
+                "aiocqhttp:group:300",
+            ],
+        )

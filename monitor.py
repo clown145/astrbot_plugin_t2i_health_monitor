@@ -133,6 +133,29 @@ def parse_targets(raw_targets: object) -> tuple[list[T2ITarget], list[str]]:
     return targets, errors
 
 
+def normalize_umos(values: object, legacy_value: object = "") -> list[str]:
+    """Return ordered, non-empty, unique UMO strings from list and legacy fields."""
+
+    candidates: list[object] = []
+    if isinstance(values, list):
+        candidates.extend(values)
+    elif isinstance(values, str):
+        candidates.append(values)
+    if isinstance(legacy_value, str):
+        candidates.append(legacy_value)
+
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        if not isinstance(candidate, str):
+            continue
+        umo = candidate.strip()
+        if umo and umo not in seen:
+            seen.add(umo)
+            normalized.append(umo)
+    return normalized
+
+
 class T2IProbeClient:
     """Probe a t2i service through its public text2img API."""
 
