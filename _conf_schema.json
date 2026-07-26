@@ -1,0 +1,132 @@
+{
+  "targets": {
+    "type": "template_list",
+    "description": "t2i 目标服务",
+    "hint": "每个目标都通过其公开的 /text2img/generate API 直接探测。id 用于保留历史统计，创建后请勿随意修改。",
+    "templates": {
+      "t2i": {
+        "name": "t2i 服务",
+        "items": {
+          "id": {
+            "type": "string",
+            "description": "稳定目标 ID",
+            "default": "t2i-main",
+            "hint": "仅可使用字母、数字、点、下划线和连字符。"
+          },
+          "name": {
+            "type": "string",
+            "description": "显示名称",
+            "default": "主 t2i"
+          },
+          "base_url": {
+            "type": "string",
+            "description": "t2i 服务根地址",
+            "default": "https://t2i.ciallo.de5.net",
+            "hint": "例如 https://t2i.example.com；不要填写 /docs 或 /text2img/generate。"
+          },
+          "enabled": {
+            "type": "bool",
+            "description": "启用此目标",
+            "default": true
+          },
+          "timeout_seconds": {
+            "type": "int",
+            "description": "单次 HTTP 超时（秒）",
+            "default": 15,
+            "slider": {
+              "min": 1,
+              "max": 120,
+              "step": 1
+            }
+          }
+        }
+      }
+    },
+    "default": []
+  },
+  "probe_interval_seconds": {
+    "type": "int",
+    "description": "探测间隔（秒）",
+    "default": 60,
+    "slider": {
+      "min": 10,
+      "max": 3600,
+      "step": 10
+    }
+  },
+  "probe_on_startup": {
+    "type": "bool",
+    "description": "插件加载后立即探测",
+    "default": true
+  },
+  "max_parallel_probes": {
+    "type": "int",
+    "description": "并行探测目标数",
+    "default": 3,
+    "slider": {
+      "min": 1,
+      "max": 20,
+      "step": 1
+    }
+  },
+  "failure_retry_count": {
+    "type": "int",
+    "description": "单轮失败后的重试次数",
+    "default": 2,
+    "slider": {
+      "min": 0,
+      "max": 10,
+      "step": 1
+    }
+  },
+  "retry_delay_seconds": {
+    "type": "int",
+    "description": "失败重试间隔（秒）",
+    "default": 5,
+    "slider": {
+      "min": 0,
+      "max": 300,
+      "step": 1
+    }
+  },
+  "timezone": {
+    "type": "string",
+    "description": "日报时区",
+    "default": "Asia/Shanghai",
+    "hint": "使用 IANA 时区名称，例如 Asia/Shanghai。"
+  },
+  "daily_push_time": {
+    "type": "string",
+    "description": "每日推送时间",
+    "default": "09:00",
+    "hint": "24 小时制 HH:MM，按日报时区执行。"
+  },
+  "daily_push_umo": {
+    "type": "string",
+    "description": "日报推送 UMO",
+    "default": "",
+    "hint": "群聊示例：aiocqhttp:group:123456。可通过 AstrBot 的 /sid 获取。"
+  },
+  "failure_push_umo": {
+    "type": "string",
+    "description": "故障推送 UMO",
+    "default": "",
+    "hint": "某目标耗尽重试后向此 UMO 推送故障信息。"
+  },
+  "failure_notification_cooldown_seconds": {
+    "type": "int",
+    "description": "同一故障重复通知冷却（秒）",
+    "default": 1800,
+    "hint": "设为 0 会在每一轮耗尽重试后都推送。",
+    "slider": {
+      "min": 0,
+      "max": 86400,
+      "step": 60
+    }
+  },
+  "send_recovery_notice": {
+    "type": "bool",
+    "description": "故障恢复后推送恢复通知",
+    "default": true
+  }
+}

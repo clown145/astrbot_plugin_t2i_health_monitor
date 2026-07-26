@@ -1,0 +1,10 @@
+name: astrbot_plugin_t2i_health_monitor
+display_name: t2i Health Monitor
+desc: Directly probes multiple t2i services and pushes health reports through UMO.
+version: v0.1.0
+author: clown145
+repo: https://github.com/clown145/astrbot_plugin_t2i_health_monitor
+astrbot_version: ">=4.16,<5"
+tags:
+  - monitoring
+  - t2i
