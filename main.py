@@ -122,13 +122,20 @@ class T2IHealthMonitor(Star):
         except asyncio.TimeoutError:
             return False
 
-    async def _run_probe_cycle(self) -> list[ProbeResult]:
+    async def _run_probe_cycle(
+        self,
+        target_id: str | None = None,
+    ) -> list[ProbeResult]:
+        """Probe every enabled target, or one enabled target selected by its ID."""
+
         probe_client = self._probe_client
         if probe_client is None:
             return []
 
         async with self._cycle_lock:
             targets = self._configured_targets()
+            if target_id is not None:
+                targets = [target for target in targets if target.target_id == target_id]
             enabled_targets = [target for target in targets if target.enabled]
             if not enabled_targets:
                 if not self._reported_missing_targets:
@@ -187,7 +194,9 @@ class T2IHealthMonitor(Star):
             await self._save_state_locked()
         return notifications
 
-    async def _send_daily_report(self) -> None:
+    async def _send_daily_report(self, *, reset_period: bool = True) -> bool:
+        """Send the daily-format report and optionally start a new report period."""
+
         daily_umos = self._daily_push_umos()
         if not daily_umos:
             if not self._reported_missing_daily_umo:
@@ -195,7 +204,7 @@ class T2IHealthMonitor(Star):
                     "t2i daily report is enabled but daily_push_umos is not configured",
                 )
                 self._reported_missing_daily_umo = True
-            return
+            return False
         self._reported_missing_daily_umo = False
 
         targets = self._configured_targets()
@@ -213,9 +222,11 @@ class T2IHealthMonitor(Star):
                 logger.warning(
                     "t2i daily report was not delivered to every configured UMO; retaining the report period",
                 )
-                return
-            self._state.reset_period(utc_now_iso())
-            await self._save_state_locked()
+                return False
+            if reset_period:
+                self._state.reset_period(utc_now_iso())
+                await self._save_state_locked()
+        return True
 
     async def _send_failure_notification(self, notification: NotificationEvent) -> None:
         umos = self._failure_push_umos()
@@ -410,12 +421,8 @@ class T2IHealthMonitor(Star):
         logger.warning(f"invalid t2i monitor daily_push_time '{raw_time}', using 09:00")
         return 9, 0
 
-    @filter.command_group("t2i-health")
-    def t2i_health(self):
-        """查看或立即执行 t2i 健康探测。"""
-
     @filter.permission_type(filter.PermissionType.ADMIN)
-    @t2i_health.command("status")
+    @filter.command("t2i状", alias={"图状"})
     async def health_status(self, event: AstrMessageEvent):
         """查看所有 t2i 目标的当前健康统计。"""
 
@@ -429,24 +436,55 @@ class T2IHealthMonitor(Star):
         yield event.plain_result(report).use_t2i(False)
 
     @filter.permission_type(filter.PermissionType.ADMIN)
-    @t2i_health.command("probe")
-    async def health_probe(self, event: AstrMessageEvent):
-        """立即对所有启用的 t2i 目标执行一次完整探测。"""
+    @filter.command("t2i报", alias={"图报"})
+    async def health_report(self, event: AstrMessageEvent):
+        """立即向日报 UMO 推送一次日报，不重置统计周期。"""
 
-        results = await self._run_probe_cycle()
-        success_count = sum(1 for result in results if result.success)
-        if results:
-            summary = f"已完成 {len(results)} 个 t2i 目标探测：{success_count} 成功，{len(results) - success_count} 失败。"
+        delivered = await self._send_daily_report(reset_period=False)
+        if delivered:
+            message = "日报已推送，统计周期未重置。"
+        elif self._daily_push_umos():
+            message = "日报推送未完成，请查看 AstrBot 日志。"
         else:
-            summary = "没有可探测的启用 t2i 目标。"
-        targets = self._configured_targets()
-        async with self._state_lock:
-            report = self._format_health_report(
-                targets,
-                self._configured_timezone(),
-                title="t2i 当前健康状态",
+            message = "未配置日报推送 UMO。"
+        yield event.plain_result(message).use_t2i(False)
+
+    @filter.permission_type(filter.PermissionType.ADMIN)
+    @filter.command("t2i", alias={"探图"})
+    async def health_probe(
+        self,
+        event: AstrMessageEvent,
+        target_id: str | None = None,
+    ):
+        """立即探测全部启用目标，或指定一个 t2i 目标 ID。"""
+
+        requested_target_id = (target_id or "").strip()
+        if requested_target_id:
+            target = next(
+                (
+                    configured_target
+                    for configured_target in self._configured_targets()
+                    if configured_target.target_id == requested_target_id
+                ),
+                None,
             )
-        yield event.plain_result(f"{summary}\n\n{report}").use_t2i(False)
+            if target is None:
+                yield event.plain_result(
+                    f"未找到 t2i 目标: {requested_target_id}",
+                ).use_t2i(False)
+                return
+            if not target.enabled:
+                yield event.plain_result(
+                    f"t2i 目标已禁用: {target.name} ({target.target_id})",
+                ).use_t2i(False)
+                return
+
+        results = await self._run_probe_cycle(requested_target_id or None)
+        if not results:
+            message = "没有可探测的启用 t2i 目标。"
+        else:
+            message = _format_probe_results(results)
+        yield event.plain_result(message).use_t2i(False)
 
 
 def _format_stats(stats: Any) -> str:
@@ -454,6 +492,27 @@ def _format_stats(stats: Any) -> str:
     if health_percent is None:
         return "无数据"
     return f"{health_percent:.2f}% ({stats.successful_cycles}/{stats.cycles} 成功)"
+
+
+def _format_probe_results(results: list[ProbeResult]) -> str:
+    success_count = sum(1 for result in results if result.success)
+    lines = [
+        "t2i 探测结果",
+        f"共 {len(results)} 个目标：{success_count} 成功，{len(results) - success_count} 失败。",
+    ]
+    for result in results:
+        lines.extend(
+            [
+                "",
+                f"[{result.target_name}] {'成功' if result.success else '失败'}",
+                f"目标: {result.target_id}",
+                f"尝试: {result.attempts} 次（含重试）",
+                f"耗时: {result.latency_ms} ms",
+            ],
+        )
+        if not result.success:
+            lines.append(f"错误: {_display_text(result.error or 'unknown error')}")
+    return "\n".join(lines)
 
 
 def _format_latency(value: int | None) -> str:

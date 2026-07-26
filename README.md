@@ -62,14 +62,22 @@ The report period is reset only after AstrBot confirms delivery to every `daily_
 
 ## Commands
 
-Both commands require an AstrBot administrator:
+All commands require an AstrBot administrator:
 
 ```text
-/t2i-health status
-/t2i-health probe
+/t2i [target_id]
+/探图 [target_id]
+/t2i报
+/图报
+/t2i状
+/图状
 ```
 
-`status` reads the current statistics. `probe` immediately runs one full probe round for every enabled target and applies the same retry and failure-notification rules as scheduled monitoring.
+`/t2i` immediately probes every enabled target. Add a configured `target_id` to probe only that t2i service. Its reply shows each target's success or failure, attempt count, latency, and error when one occurred. `/探图` is the Chinese alias.
+
+`/t2i报` immediately sends the same report as the scheduled daily report to every configured `daily_push_umos` target. It does not reset the report period. `/图报` is the Chinese alias.
+
+`/t2i状` reads the current statistics without running a probe. `/图状` is the Chinese alias.
 
 ## Development
 
